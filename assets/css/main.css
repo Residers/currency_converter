@@ -1,4 +1,16 @@
-/* @tailwind base;
-@tailwind components;
-@tailwind utilities; */
 @import "tailwindcss";
+header {
+  @apply sticky top-0 z-50;
+}
+
+nav a {
+  @apply px-3 py-2 rounded hover:bg-blue-500 transition;
+}
+
+nav a.router-link-active {
+  @apply bg-blue-700;
+}
+
+.rates-refresh {
+  @apply transition-transform hover:rotate-180;
+}

@@ -1,8 +1,16 @@
+import currencyService from "~/services/currency"
+const currencyList = ref<string[]>([])
+const rates = reactive<Record<string, number>>({})
+const fromCurrency = ref("USD")
+const toCurrency = ref<string>("EUR")
+const historicalRates = ref<number[]>([])
+const historicalDates = ref<string[]>([])
 export const useCurrency = () => {
   // Глобальное состояние курсов (кешируется между страницами)
-  const rates = useState<Record<string, number>>("rates", () => ({}))
-  const currencyList = ref<string[]>([])
+
+  // const rates = useState<Record<string, number>>("rates", () => ({}))
   const lastUpdated = useState<string>("lastUpdated", () => "")
+  const isUpdating = ref(false)
   // История операций
   const history = useState<IHistory[]>("conversion-history", () => [])
   interface IHistory {
@@ -23,26 +31,59 @@ export const useCurrency = () => {
  * 
  * @returns The converted amount or undefined if the conversion could not be performed.
  */
+  async function fetchHistoricalData() {
+    try {
+      //TODO add access key
+      const { data } = await useFetch(
+        `https://api.exchangerate.host/timeseries?base=${
+          fromCurrency.value
+        }&symbols=${toCurrency.value}&start_date=${getPastDate(
+          7
+        )}&end_date=${getCurrentDate()}`
+      )
 
+      historicalDates.value = Object.keys(data.value?.rates || {})
+      historicalRates.value = historicalDates.value.map(
+        (date) => data.value?.rates[date][toCurrency.value]
+      )
+    } catch (error) {
+      console.error("Error fetching historical data:", error)
+    }
+  }
+  function getPastDate(days: number) {
+    const date = new Date()
+    date.setDate(date.getDate() - days)
+    return date.toISOString().split("T")[0]
+  }
+  function getCurrentDate() {
+    return new Date().toISOString().split("T")[0]
+  }
   const fetchRates = async () => {
-    console.log("🚀 ~ fetchRates ~ rates.value:", rates.value)
-    if (Object.keys(rates.value).length > 0) return // Не грузим повторно
-
-    const { data } = await useFetch(
-      "https://api.exchangerate-api.com/v4/latest/USD"
-    )
-    if (data.value) {
-      currencyList.value = Object.keys(data.value.rates)
-      rates.value = data.value.rates
+    if (isUpdating.value) return
+    try {
+      isUpdating.value = true
+      const data = await currencyService.fetchRates()
+      if (data) {
+        currencyList.value = Object.keys(data.rates)
+        console.log(
+          "🚀 ~ fetchRates ~ currencyList.value :",
+          currencyList.value
+        )
+        console.log("🚀 ~ fetchRates ~ data.rates:", data.rates)
+        rates.value = data.rates
+        lastUpdated.value = formatTime(new Date().toUTCString())
+      }
+    } catch (error) {
+      console.error("Ошибка загрузки курсов:", error)
+    } finally {
+      setTimeout(() => (isUpdating.value = false), 5000) // Не чаще чем раз в 5 сек
     }
   }
 
   // Конвертация + добавление в историю
   const convert = (amount: number, from: string, to: string) => {
-    console.log("🚀 ~ convert ~ convert:", rates.value[from], rates.value[to])
     if (!rates.value[from] || !rates.value[to]) return null
     const result = (amount * rates.value[to]) / rates.value[from]
-    console.log("🚀 ~ convert ~ result:", result)
 
     history.value.unshift({
       date: new Date().toLocaleString(),
@@ -55,5 +96,18 @@ export const useCurrency = () => {
     return result
   }
 
-  return { rates, fetchRates, convert, history, currencyList }
+  return {
+    rates,
+    fetchRates,
+    convert,
+    history,
+    currencyList,
+    lastUpdated,
+    isUpdating,
+    fetchHistoricalData,
+    fromCurrency,
+    toCurrency,
+    historicalDates,
+    historicalRates,
+  }
 }
