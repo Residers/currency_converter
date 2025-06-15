@@ -5,7 +5,15 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ["@nuxt/test-utils", "@nuxt/eslint", "@nuxt/icon", "@pinia/nuxt"],
   css: ["~/assets/css/main.css"],
-
+  runtimeConfig: {
+    public: {
+      currencyApiKey: process.env.NUXT_CURRENCY_API_KEY,
+      openexchangeratesApiKey:
+        process.env.NUXT_CURRENCY_API_KEY_OPENEXCHANGERATES,
+      currencyApiUrl: process.env.NUXT_CURRENCY_API_URL,
+      openexchangeratesApiUrl: process.env.NUXT_CURRENCY_API_URL,
+    },
+  },
   vite: {
     plugins: [tailwindcss()],
   },

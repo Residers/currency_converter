@@ -1,16 +1,16 @@
 import currencyService from "~/services/currency"
-const currencyList = ref<string[]>([])
+
+// Глобальное состояние курсов (кешируется между страницами)
 const rates = reactive<Record<string, number>>({})
+const lastUpdated = ref<string>("")
 const fromCurrency = ref("USD")
 const toCurrency = ref<string>("EUR")
 const historicalRates = ref<number[]>([])
 const historicalDates = ref<string[]>([])
-export const useCurrency = () => {
-  // Глобальное состояние курсов (кешируется между страницами)
+const isLoading = ref(false)
+const currencyList = ref<string[]>([])
 
-  // const rates = useState<Record<string, number>>("rates", () => ({}))
-  const lastUpdated = useState<string>("lastUpdated", () => "")
-  const isUpdating = ref(false)
+export const useCurrency = () => {
   // История операций
   const history = useState<IHistory[]>("conversion-history", () => [])
   interface IHistory {
@@ -31,52 +31,42 @@ export const useCurrency = () => {
  * 
  * @returns The converted amount or undefined if the conversion could not be performed.
  */
-  async function fetchHistoricalData() {
+  async function fetchHistoricalData(days = 7): Promise<void> {
     try {
-      //TODO add access key
-      const { data } = await useFetch(
-        `https://api.exchangerate.host/timeseries?base=${
-          fromCurrency.value
-        }&symbols=${toCurrency.value}&start_date=${getPastDate(
-          7
-        )}&end_date=${getCurrentDate()}`
-      )
+      isLoading.value = true
 
-      historicalDates.value = Object.keys(data.value?.rates || {})
-      historicalRates.value = historicalDates.value.map(
-        (date) => data.value?.rates[date][toCurrency.value]
-      )
-    } catch (error) {
-      console.error("Error fetching historical data:", error)
+      const data = await currencyService.fetchHistoricalData({
+        toCurrency: toCurrency.value,
+        fromCurrency: fromCurrency.value,
+        days,
+      })
+
+      if (data?.rates) {
+        historicalDates.value = data.dates
+        historicalRates.value = data.rates
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      isLoading.value = false
     }
   }
-  function getPastDate(days: number) {
-    const date = new Date()
-    date.setDate(date.getDate() - days)
-    return date.toISOString().split("T")[0]
-  }
-  function getCurrentDate() {
-    return new Date().toISOString().split("T")[0]
-  }
+
   const fetchRates = async () => {
-    if (isUpdating.value) return
+    if (isLoading.value) return
     try {
-      isUpdating.value = true
-      const data = await currencyService.fetchRates()
+      isLoading.value = true
+      const data = await currencyService.fetchRates(fromCurrency.value)
       if (data) {
         currencyList.value = Object.keys(data.rates)
-        console.log(
-          "🚀 ~ fetchRates ~ currencyList.value :",
-          currencyList.value
-        )
-        console.log("🚀 ~ fetchRates ~ data.rates:", data.rates)
+
         rates.value = data.rates
         lastUpdated.value = formatTime(new Date().toUTCString())
       }
     } catch (error) {
       console.error("Ошибка загрузки курсов:", error)
     } finally {
-      setTimeout(() => (isUpdating.value = false), 5000) // Не чаще чем раз в 5 сек
+      setTimeout(() => (isLoading.value = false), 5000) // Не чаще чем раз в 5 сек
     }
   }
 
@@ -95,7 +85,15 @@ export const useCurrency = () => {
 
     return result
   }
-
+  // Автоматически загружаем данные при изменении валют
+  watch(
+    [fromCurrency, toCurrency],
+    ([newFrom, newTo]) => {
+      fetchRates()
+      fetchHistoricalData()
+    },
+    { immediate: true }
+  )
   return {
     rates,
     fetchRates,
@@ -103,7 +101,7 @@ export const useCurrency = () => {
     history,
     currencyList,
     lastUpdated,
-    isUpdating,
+    isLoading,
     fetchHistoricalData,
     fromCurrency,
     toCurrency,

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-const { rates, lastUpdated, fetchRates, isUpdating } = useCurrency()
+const { rates, lastUpdated, fetchRates, isLoading } = useCurrency()
 const clientTime = ref("")
 
 onMounted(async () => {
-  if (Object.keys(rates.value).length === 0) {
+  if (rates.value && Object.keys(rates.value).length === 0) {
     await fetchRates()
   }
 
@@ -56,7 +56,7 @@ const navItems = [
           <Icon
             name="mdi:refresh"
             class="w-4 h-4"
-            :class="{ 'animate-spin': isUpdating }"
+            :class="{ 'animate-spin': isLoading }"
           />
           <span v-if="clientTime">{{ clientTime }}</span>
         </button>

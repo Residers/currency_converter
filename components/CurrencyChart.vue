@@ -23,8 +23,13 @@ ChartJS.register(
   TimeScale
 )
 
-const { fromCurrency, toCurrency, historicalDates, historicalRates } =
-  useCurrency()
+const {
+  fromCurrency,
+  toCurrency,
+  historicalDates,
+  historicalRates,
+  isLoading,
+} = useCurrency()
 
 const chartData = computed(() => ({
   labels: historicalDates.value,
@@ -68,8 +73,13 @@ const chartOptions = {
     <h2 class="text-xl font-semibold mb-4">
       Динамика курса: {{ fromCurrency }} → {{ toCurrency }}
     </h2>
-    <div class="h-64">
-      {{ chartData }}
+    <div
+      v-if="isLoading"
+      class="absolute inset-0 flex items-center justify-center bg-white/50 z-10"
+    >
+      <Icon name="eos-icons:loading" size="32" class="text-blue-500" />
+    </div>
+    <div v-else class="h-64">
       <Line :data="chartData" :options="chartOptions" />
     </div>
   </div>
